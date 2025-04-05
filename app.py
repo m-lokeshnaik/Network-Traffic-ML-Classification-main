@@ -8,8 +8,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
-import seaborn as sns
-import matplotlib.pyplot as plt
 import joblib
 
 # Initialize session state
@@ -130,14 +128,14 @@ if training_file is not None:
             # Display training results
             st.success(f"Model training completed! Accuracy: {accuracy:.2%}")
             
-            # Display confusion matrix
+            # Display confusion matrix using streamlit
             st.subheader("Confusion Matrix")
-            fig, ax = plt.subplots(figsize=(10, 8))
-            sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
-            plt.title('Confusion Matrix')
-            plt.ylabel('True Label')
-            plt.xlabel('Predicted Label')
-            st.pyplot(fig)
+            conf_df = pd.DataFrame(
+                conf_matrix,
+                index=[f'True {i}' for i in np.unique(y)],
+                columns=[f'Pred {i}' for i in np.unique(y)]
+            )
+            st.write(conf_df)
             
             # Display classification report
             st.subheader("Classification Report")
@@ -176,15 +174,10 @@ if training_file is not None:
                                 st.subheader("Classification Results")
                                 st.write(pred_df[['Length', 'Protocol', 'Source', 'Destination', 'Predicted_Class']].head(10))
                                 
-                                # Show distribution of predictions
+                                # Show distribution of predictions using streamlit
                                 st.subheader("Distribution of Predictions")
-                                fig, ax = plt.subplots(figsize=(10, 6))
-                                pred_series = pd.Series(predictions)
-                                pred_series.value_counts().plot(kind='bar')
-                                plt.title('Distribution of Predictions')
-                                plt.xlabel('Class')
-                                plt.ylabel('Count')
-                                st.pyplot(fig)
+                                pred_counts = pd.Series(predictions).value_counts()
+                                st.bar_chart(pred_counts)
                                 
                         except Exception as e:
                             st.error(f"An error occurred during classification: {str(e)}")
@@ -206,17 +199,6 @@ model_info = {
     "K-Nearest Neighbors": "Good for pattern recognition in similar traffic patterns"
 }
 st.sidebar.write(model_info[model_choice])
-
-# Add requirements section
-requirements = """
-Requirements:
-- Python 3.7+
-- streamlit
-- pandas
-- numpy
-- scikit-learn
-"""
-a
 
 # Footer
 st.markdown("---")
