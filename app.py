@@ -6,6 +6,8 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
 import joblib
 
 # Set page config
@@ -44,16 +46,30 @@ if uploaded_file is not None:
             st.error("The uploaded file must contain the following columns: Length, Protocol, Source, Destination")
         else:
             # Encode categorical features
-            protocol_encoder = LabelEncoder()
-            source_encoder = LabelEncoder()
-            dest_encoder = LabelEncoder()
+            label_encoders = {}
+            for col in ['Source', 'Destination', 'Protocol']:
+                le = LabelEncoder()
+                df[col + '_encoded'] = le.fit_transform(df[col])
+                label_encoders[col] = le
 
-            df['Protocol_encoded'] = protocol_encoder.fit_transform(df['Protocol'])
-            df['Source_encoded'] = source_encoder.fit_transform(df['Source'])
-            df['Destination_encoded'] = dest_encoder.fit_transform(df['Destination'])
+            # Categorize 'Length' into Low, Medium, High
+            q1 = df['Length'].quantile(0.33)
+            q2 = df['Length'].quantile(0.66)
+
+            def categorize_length(length):
+                if length <= q1:
+                    return 'Low'
+                elif length <= q2:
+                    return 'Medium'
+                else:
+                    return 'High'
+
+            df['Label'] = df['Length'].apply(categorize_length)
+            df['Label'] = LabelEncoder().fit_transform(df['Label'])  # 0: Low, 1: Medium, 2: High
 
             # Feature matrix
             X = df[['Length', 'Protocol_encoded', 'Source_encoded', 'Destination_encoded']]
+            y = df['Label']
 
             # Scale features
             scaler = StandardScaler()
@@ -69,26 +85,23 @@ if uploaded_file is not None:
             else:  # KNN
                 model = KNeighborsClassifier(n_neighbors=3)
 
-            # Train and predict if label is present
+            # Classify traffic
             if st.button("Classify Traffic"):
                 with st.spinner("Processing and classifying..."):
-                    if 'Label' in df.columns:
-                        y = df['Label']
-                        model.fit(X_scaled, y)
-                        predictions = model.predict(X_scaled)
-                        df['Predicted_Class'] = predictions
-                        st.success("Classification complete using training data!")
-                    else:
-                        st.warning("No 'Label' column found. Model will predict without training. Results may be invalid.")
-                        try:
-                            predictions = model.predict(X_scaled)
-                            df['Predicted_Class'] = predictions
-                        except Exception as e:
-                            st.error(f"Model couldn't classify without training: {e}")
-                            st.stop()
+                    # Split data for evaluation
+                    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+                    model.fit(X_train, y_train)
+                    predictions = model.predict(X_test)
 
-                    # Display results
-                    st.subheader("Classification Results")
+                    # Evaluation
+                    st.subheader("Model Evaluation")
+                    st.write("**Accuracy:**", accuracy_score(y_test, predictions))
+                    st.text("Classification Report:")
+                    st.text(classification_report(y_test, predictions))
+
+                    # Predict on all data and show results
+                    df['Predicted_Class'] = model.predict(X_scaled)
+                    st.subheader("Classification Results (Top 10 Rows)")
                     st.write(df[['Length', 'Protocol', 'Source', 'Destination', 'Predicted_Class']].head(10))
 
                     # Prediction distribution
